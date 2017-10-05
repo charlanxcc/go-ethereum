@@ -471,6 +471,17 @@ func (self *worker) commitNewWork() {
 		log.Error("Failed to fetch pending transactions", "err", err)
 		return
 	}
+	if len(pending) <= 0 {
+		log.Debug("No pending transactions.")
+		self.push(work)
+		return
+	} else {
+		n := 0
+		for _, m := range pending {
+			n += len(m)
+		}
+		log.Info(fmt.Sprintf("%d pending transactions.", n))
+	}
 	txs := types.NewTransactionsByPriceAndNonce(self.current.signer, pending)
 	work.commitTransactions(self.mux, txs, self.chain, self.coinbase)
 
