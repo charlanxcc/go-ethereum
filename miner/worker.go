@@ -291,7 +291,7 @@ func (self *worker) wait() {
 		for result := range self.recv {
 			atomic.AddInt32(&self.atWork, -1)
 
-			if result == nil {
+			if result == nil || result.Work == nil {
 				continue
 			}
 			block := result.Block
@@ -304,6 +304,10 @@ func (self *worker) wait() {
 				}
 				go self.mux.Post(core.NewMinedBlockEvent{Block: block})
 			} else {
+				fmt.Printf("self=%+v\nwork=%+v\n", self, work)
+
+
+
 				work.state.CommitTo(self.chainDb, self.config.IsEIP158(block.Number()))
 				stat, err := self.chain.WriteBlock(block)
 				if err != nil {
