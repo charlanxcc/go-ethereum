@@ -101,8 +101,7 @@ done:
 
 func (self *CpuAgent) mine(work *Work, stop <-chan struct{}) {
 	if work.Block == nil {
-		time.Sleep(2 * time.Second)
-			self.returnCh <- &Result{nil, nil}
+		self.returnCh <- &Result{nil, nil}
 		return
 	}
 
