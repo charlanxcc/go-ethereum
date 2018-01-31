@@ -65,7 +65,7 @@ func StartEtcd(ctx *cli.Context, name, cluster, datadir string) {
 	port := 0
 	//"etcd1.1=http://bmk1:20010,etcd1.2=http://bmk1:20020,etcd1.3=http://bmk1\:20030"
 	{
-		ls := strings.Split(cluster, ",")
+		ls := strings.Split(etcdCluster, ",")
 		for _, i := range ls {
 			i = strings.TrimSpace(i)
 			l := strings.Split(i, "=")
@@ -90,7 +90,7 @@ func StartEtcd(ctx *cli.Context, name, cluster, datadir string) {
 
 	cfg := embed.NewConfig()
 	cfg.Dir = fmt.Sprintf("%s/default.etcd", datadir)
-	cfg.Name = ctx.GlobalString(name)
+	cfg.Name = etcdName
 	u, _ := url.Parse(fmt.Sprintf("http://%s:%d", lip, port))
 	cfg.LPUrls = []url.URL{*u}
 	cfg.APUrls = []url.URL{*u}
@@ -98,7 +98,7 @@ func StartEtcd(ctx *cli.Context, name, cluster, datadir string) {
 	cfg.LCUrls = []url.URL{*u}
 	cfg.ACUrls = []url.URL{*u}
 	cfg.ClusterState = "new"
-	cfg.InitialCluster = cluster
+	cfg.InitialCluster = etcdCluster
 	cfg.InitialClusterToken = "etcd"
 
 	var err error
