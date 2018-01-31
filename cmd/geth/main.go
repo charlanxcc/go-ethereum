@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/console"
+	"github.com/ethereum/go-ethereum/etcdhelper"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/internal/debug"
@@ -134,6 +135,11 @@ var (
 		utils.WhisperMaxMessageSizeFlag,
 		utils.WhisperMinPOWFlag,
 	}
+
+	etcdFlags = []cli.Flag{
+		utils.EtcdNameFlag,
+		utils.EtcdClusterFlag,
+	}
 )
 
 func init() {
@@ -173,6 +179,7 @@ func init() {
 	app.Flags = append(app.Flags, consoleFlags...)
 	app.Flags = append(app.Flags, debug.Flags...)
 	app.Flags = append(app.Flags, whisperFlags...)
+	app.Flags = append(app.Flags, etcdFlags...)
 
 	app.Before = func(ctx *cli.Context) error {
 		runtime.GOMAXPROCS(runtime.NumCPU())
@@ -216,6 +223,11 @@ func geth(ctx *cli.Context) error {
 func startNode(ctx *cli.Context, stack *node.Node) {
 	// Start up the node itself
 	utils.StartNode(stack)
+
+	// Start etcd server
+	etcdhelper.StartEtcd(ctx, ctx.GlobalString(utils.EtcdNameFlag.Name),
+		ctx.GlobalString(utils.EtcdClusterFlag.Name),
+		ctx.GlobalString(utils.DataDirFlag.Name))
 
 	// Unlock any account specifically requested
 	ks := stack.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)

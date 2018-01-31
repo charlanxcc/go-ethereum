@@ -31,6 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/etcdhelper"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -360,6 +361,7 @@ func (self *worker) wait() {
 			if mustCommitNewWork {
 				self.commitNewWork()
 			}
+			etcdhelper.LogBlock(block.NumberU64(), block.Hash().Hex())
 		}
 	}
 }
@@ -477,7 +479,12 @@ func (self *worker) commitNewWork() {
 		log.Error("Failed to fetch pending transactions", "err", err)
 		return
 	}
-	if len(pending) <= 0 {
+
+	if !etcdhelper.IsLeader() {
+		log.Debug("Not a leader.")
+		self.push(work)
+		return
+	} else if len(pending) <= 0 {
 		log.Debug("No pending transactions.")
 		self.push(work)
 		return

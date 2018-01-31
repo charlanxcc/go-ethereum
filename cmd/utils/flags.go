@@ -485,6 +485,16 @@ var (
 		Usage: "Minimum POW accepted",
 		Value: whisper.DefaultMinimumPoW,
 	}
+	EtcdNameFlag = cli.StringFlag{
+		Name: "etcdname",
+		Usage: "etcd name",
+		Value: "",
+	}
+	EtcdClusterFlag = cli.StringFlag{
+		Name: "etcdcluster",
+		Usage: "etcd cluster",
+		Value: "",
+	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating
