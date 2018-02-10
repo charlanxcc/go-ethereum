@@ -11,31 +11,36 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
-	
+
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/clientv3/concurrency"
 	"github.com/coreos/etcd/embed"
 	"github.com/coreos/etcd/etcdserver/api/v3client"
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 	"gopkg.in/urfave/cli.v1"
 )
 
 var (
-    operationTimeout = 30 * time.Second
+	operationTimeout      = 30 * time.Second
 	etcdName, etcdCluster string
-	etcd *embed.Etcd
-	etcdcli	*clientv3.Client
-	myid types.ID
-	mypeerurl string
-	lockSession *concurrency.Session
-	lock *concurrency.Mutex
+	etcd                  *embed.Etcd
+	etcdcli               *clientv3.Client
+	mypeerurl             string
+	lockSession           *concurrency.Session
+	lock                  *concurrency.Mutex
+	yieldCount            int64
+
+	// notification when a new transaction arrives
+	TxNotifier = make(chan bool, 1)
 )
 
 func fatalf(format string, args ...interface{}) {
-    fmt.Fprintf(os.Stderr, "Fatal: " + format + "\n", args...)
-    os.Exit(1)
+	fmt.Fprintf(os.Stderr, "Fatal: "+format+"\n", args...)
+	os.Exit(1)
 }
 
 func StartEtcd(ctx *cli.Context, name, cluster, datadir string) {
@@ -59,7 +64,7 @@ func StartEtcd(ctx *cli.Context, name, cluster, datadir string) {
 	}
 
 	if lip == "" {
-		fatalf("FATAL: etcd failed to start: can't figure out local ip address\n")
+		fatalf("etcd failed to start: can't figure out local ip address\n")
 	}
 
 	port := 0
@@ -85,7 +90,7 @@ func StartEtcd(ctx *cli.Context, name, cluster, datadir string) {
 		}
 	}
 	if port == 0 {
-		fatalf("FATAL: etcd failed to start: port is not given\n")
+		fatalf("etcd failed to start: port is not given\n")
 	}
 
 	cfg := embed.NewConfig()
@@ -94,7 +99,7 @@ func StartEtcd(ctx *cli.Context, name, cluster, datadir string) {
 	u, _ := url.Parse(fmt.Sprintf("http://%s:%d", lip, port))
 	cfg.LPUrls = []url.URL{*u}
 	cfg.APUrls = []url.URL{*u}
-	u, _  = url.Parse(fmt.Sprintf("http://%s:%d", lip, port+1))
+	u, _ = url.Parse(fmt.Sprintf("http://%s:%d", lip, port+1))
 	cfg.LCUrls = []url.URL{*u}
 	cfg.ACUrls = []url.URL{*u}
 	cfg.ClusterState = "new"
@@ -123,28 +128,56 @@ func IsLeader() bool {
 	if etcd == nil {
 		return false
 	} else {
-		if myid == 0 {
-			for _, i := range etcd.Server.Cluster().Members() {
-				if i.RaftAttributes.PeerURLs[0] == mypeerurl {
-					myid = i.ID
-				}
-			}
-		}
-		return myid == etcd.Server.Leader()
+		return etcd.Server.ID() == etcd.Server.Leader()
 	}
 }
 
+func YieldLeadership() {
+	if !IsLeader() {
+		return
+	}
+
+	yieldCount = 0
+
+	members := etcd.Server.Cluster().Members()
+	ix := 0
+	for i := 0; i < len(members); i++ {
+		if members[i].ID == etcd.Server.ID() {
+			ix = i
+			break
+		}
+	}
+
+	for j := ix + 1; ; j++ {
+		j %= len(members)
+		if j == ix {
+			break
+		}
+
+		tm := etcd.Server.Cfg.ReqTimeout()
+		ctx, cancel := context.WithTimeout(context.Background(), tm)
+		err := etcd.Server.MoveLeader(ctx, etcd.Server.Lead(),
+			uint64(members[j].ID))
+		cancel()
+		if err == nil {
+			log.Info(fmt.Sprintf("Yielded leadership to %s\n", members[j].ID))
+			return
+		}
+	}
+	log.Error(fmt.Sprintf("Failed to yield\n"))
+}
+
 func Put(key, value string) error {
-    ctx, cancel := context.WithTimeout(context.Background(), operationTimeout)
-    _, err := etcdcli.Put(ctx, key, value)
-    cancel()
-    return err
+	ctx, cancel := context.WithTimeout(context.Background(), operationTimeout)
+	_, err := etcdcli.Put(ctx, key, value)
+	cancel()
+	return err
 }
 
 func Get(key string) (string, error) {
-    ctx, cancel := context.WithTimeout(context.Background(), operationTimeout)
-    rsp, err := etcdcli.Get(ctx, key)
-    cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), operationTimeout)
+	rsp, err := etcdcli.Get(ctx, key)
+	cancel()
 	if err != nil {
 		return "", err
 	} else if rsp.Count == 0 {
@@ -184,12 +217,24 @@ func Unlock() error {
 	return err
 }
 
-func LogBlock(number uint64, hash string) {
-	var leader types.ID
+func LogBlock(number uint64, hash string, count int) {
+	if atomic.AddInt64(&yieldCount, 1) >= int64(params.LeaderYieldAfter) && count == 0 {
+		go YieldLeadership()
+	}
+
+	var id, leader types.ID
 	if etcd != nil {
+		id = etcd.Server.ID()
 		leader = etcd.Server.Leader()
 	}
-	Put("log", fmt.Sprintf("%s: mined %d %s. myid=%d leader=%d\n", etcdName, number, hash, myid, leader))
+	Put("log", fmt.Sprintf("%s: mined %dth hash=%s %d txs. id=0x%x leader=0x%x\n", etcdName, number, hash, count, id, leader))
+}
+
+func TxNotify() {
+	if !IsLeader() {
+		return
+	}
+	TxNotifier <- true
 }
 
 /* EOF */

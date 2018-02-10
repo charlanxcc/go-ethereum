@@ -202,6 +202,18 @@ var AppHelpFlagGroups = []flagGroup{
 		},
 	},
 	{
+		Name: "COINPLUG",
+		Flags: []cli.Flag{
+			utils.EtcdNameFlag,
+			utils.EtcdClusterFlag,
+			utils.FixedDifficultyFlag,
+			utils.FixedGasLimitFlag,
+			utils.FixedBlockSizeFlag,
+			utils.MaxBlockIntervalFlag,
+			utils.LeaderYieldAfterFlag,
+		},
+	},
+	{
 		Name: "MISC",
 	},
 }

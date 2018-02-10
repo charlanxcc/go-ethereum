@@ -306,8 +306,18 @@ func (self *worker) wait() {
 				go self.mux.Post(core.NewMinedBlockEvent{Block: block})
 			} else {
 				if work == nil {
-					log.Debug("No work to do, sleeping for 3 seconds!")
-					time.Sleep(3 * time.Second)
+					log.Debug("No work to do, sleeping for 2 seconds!")
+					to := make(chan bool, 1)
+					go func() {
+						time.Sleep(2 * time.Second)
+						to <- true
+					}()
+					select {
+					case <- etcdhelper.TxNotifier:
+						// a new transaction arrived
+					case <- to:
+						// timed out
+					}
 					self.commitNewWork()
 					continue
 				}
@@ -361,7 +371,8 @@ func (self *worker) wait() {
 			if mustCommitNewWork {
 				self.commitNewWork()
 			}
-			etcdhelper.LogBlock(block.NumberU64(), block.Hash().Hex())
+			go etcdhelper.LogBlock(block.NumberU64(), block.Hash().Hex(),
+				len(block.Transactions()))
 		}
 	}
 }
@@ -423,14 +434,16 @@ func (self *worker) commitNewWork() {
 	parent := self.chain.CurrentBlock()
 
 	tstamp := tstart.Unix()
-	if parent.Time().Cmp(new(big.Int).SetInt64(tstamp)) >= 0 {
-		tstamp = parent.Time().Int64() + 1
-	}
-	// this will ensure we're not going off too far in the future
-	if now := time.Now().Unix(); tstamp > now+1 {
-		wait := time.Duration(tstamp-now) * time.Second
-		log.Info("Mining too far in the future", "wait", common.PrettyDuration(wait))
-		time.Sleep(wait)
+	if params.FixedDifficulty.BitLen() == 0 {
+		if parent.Time().Cmp(new(big.Int).SetInt64(tstamp)) >= 0 {
+			tstamp = parent.Time().Int64() + 1
+		}
+		// this will ensure we're not going off too far in the future
+		if now := time.Now().Unix(); tstamp > now+1 {
+			wait := time.Duration(tstamp-now) * time.Second
+			log.Info("Mining too far in the future", "wait", common.PrettyDuration(wait))
+			time.Sleep(wait)
+		}
 	}
 
 	num := parent.Number()
@@ -484,7 +497,7 @@ func (self *worker) commitNewWork() {
 		log.Debug("Not a leader.")
 		self.push(work)
 		return
-	} else if len(pending) <= 0 {
+	} else if len(pending) <= 0 && time.Now().Unix() - self.chain.CurrentBlock().Time().Int64() < int64(params.MaxBlockInterval) {
 		log.Debug("No pending transactions.")
 		self.push(work)
 		return
@@ -536,12 +549,15 @@ func (self *worker) commitNewWork() {
 func (self *worker) commitUncle(work *Work, uncle *types.Header) error {
 	hash := uncle.Hash()
 	if work.uncles.Has(hash) {
+		log.Error("XXX: Uncle not unique", hash)
 		return fmt.Errorf("uncle not unique")
 	}
 	if !work.ancestors.Has(uncle.ParentHash) {
+		log.Error("XXX: Uncle parfent", uncle.ParentHash, "unknown of", hash)
 		return fmt.Errorf("uncle's parent unknown (%x)", uncle.ParentHash[0:4])
 	}
 	if work.family.Has(hash) {
+		log.Error("XXX: Uncle already in family", hash)
 		return fmt.Errorf("uncle already in family (%x)", hash)
 	}
 	work.uncles.Add(uncle.Hash())

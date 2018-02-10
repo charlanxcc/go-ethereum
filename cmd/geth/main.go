@@ -136,9 +136,14 @@ var (
 		utils.WhisperMinPOWFlag,
 	}
 
-	etcdFlags = []cli.Flag{
+	coinplugFlags = []cli.Flag{
 		utils.EtcdNameFlag,
 		utils.EtcdClusterFlag,
+		utils.FixedDifficultyFlag,
+		utils.FixedGasLimitFlag,
+		utils.FixedBlockSizeFlag,
+		utils.MaxBlockIntervalFlag,
+		utils.LeaderYieldAfterFlag,
 	}
 )
 
@@ -179,7 +184,7 @@ func init() {
 	app.Flags = append(app.Flags, consoleFlags...)
 	app.Flags = append(app.Flags, debug.Flags...)
 	app.Flags = append(app.Flags, whisperFlags...)
-	app.Flags = append(app.Flags, etcdFlags...)
+	app.Flags = append(app.Flags, coinplugFlags...)
 
 	app.Before = func(ctx *cli.Context) error {
 		runtime.GOMAXPROCS(runtime.NumCPU())

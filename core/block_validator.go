@@ -104,6 +104,10 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 // The result may be modified by the caller.
 // This is miner strategy, not consensus protocol.
 func CalcGasLimit(parent *types.Block) *big.Int {
+	if params.FixedGasLimit.BitLen() != 0 {
+		return params.FixedGasLimit
+	}
+	
 	// contrib = (parentGasUsed * 3 / 2) / 1024
 	contrib := new(big.Int).Mul(parent.GasUsed(), big.NewInt(3))
 	contrib = contrib.Div(contrib, big.NewInt(2))

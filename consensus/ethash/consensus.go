@@ -235,7 +235,7 @@ func (ethash *Ethash) verifyHeader(chain consensus.ChainReader, header, parent *
 			return consensus.ErrFutureBlock
 		}
 	}
-	if header.Time.Cmp(parent.Time) <= 0 {
+	if params.FixedDifficulty.BitLen() == 0 && header.Time.Cmp(parent.Time) <= 0 {
 		return errZeroBlockTime
 	}
 	// Verify the block's difficulty based in it's timestamp and parent's difficulty
@@ -260,7 +260,7 @@ func (ethash *Ethash) verifyHeader(chain consensus.ChainReader, header, parent *
 	limit := new(big.Int).Set(parent.GasLimit)
 	limit = limit.Div(limit, params.GasLimitBoundDivisor)
 
-	if diff.Cmp(limit) >= 0 || header.GasLimit.Cmp(params.MinGasLimit) < 0 {
+	if params.FixedGasLimit.BitLen() == 0 && (diff.Cmp(limit) >= 0 || header.GasLimit.Cmp(params.MinGasLimit) < 0) {
 		return fmt.Errorf("invalid gas limit: have %v, want %v += %v", header.GasLimit, parent.GasLimit, limit)
 	}
 	// Verify that the block number is parent's +1
@@ -288,6 +288,10 @@ func (ethash *Ethash) verifyHeader(chain consensus.ChainReader, header, parent *
 // given the parent block's time and difficulty.
 // TODO (karalabe): Move the chain maker into this package and make this private!
 func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Header) *big.Int {
+	if params.FixedDifficulty.BitLen() > 0 {
+		return params.FixedDifficulty
+	}
+	
 	next := new(big.Int).Add(parent.Number, big1)
 	switch {
 	case config.IsMetropolis(next):

@@ -53,9 +53,7 @@ const (
 	MemoryGas        uint64 = 3     // Times the address of the (highest referenced byte in memory + 1). NOTE: referencing happens on read, write and in instructions such as RETURN and CALL.
 	TxDataNonZeroGas uint64 = 68    // Per byte of data attached to a transaction that is not equal to zero. NOTE: Not payable on data of calls between transactions.
 
-	//MaxCodeSize = 24576 // Maximum bytecode to permit for a contract
 	MaxCodeSize = 1024768 // Maximum bytecode to permit for a contract
-
 	MaxTransactionSize = 1024768	// Maximum transaction size
 
 	// Precompiled contract gas prices
@@ -81,6 +79,15 @@ var (
 	TargetGasLimit         = new(big.Int).Set(GenesisGasLimit) // The artificial target
 	DifficultyBoundDivisor = big.NewInt(2048)                  // The bound divisor of the difficulty, used in the update calculations.
 	GenesisDifficulty      = big.NewInt(131072)                // Difficulty of the Genesis block.
-	MinimumDifficulty      = big.NewInt(131072)                // The minimum that the difficulty may ever be.
+	MinimumDifficulty      = big.NewInt(1)                     // The minimum that the difficulty may ever be.
 	DurationLimit          = big.NewInt(13)                    // The decision boundary on the blocktime duration used to determine whether difficulty should go up or not.
+)
+
+// custom parameters
+var (
+	FixedDifficulty     = big.NewInt(0)         // 0 means no fixed difficulty
+	FixedGasLimit       = big.NewInt(0)         // 0 means no fixed gas limit
+	FixedBlockSize      = 0                     // 0 means no block size limit
+	MaxBlockInterval    = 600                   // in seconds, 10 minutes.
+	LeaderYieldAfter    = 10                    // leader yields after
 )

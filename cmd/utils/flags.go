@@ -495,6 +495,31 @@ var (
 		Usage: "etcd cluster",
 		Value: "",
 	}
+	FixedDifficultyFlag = cli.Uint64Flag{
+		Name: "fixeddifficulty",
+		Usage: "fixed difficulty",
+		Value: params.FixedDifficulty.Uint64(),
+	}
+	FixedGasLimitFlag = cli.Uint64Flag{
+		Name: "fixedgaslimit",
+		Usage: "fixed gas limit",
+		Value: params.FixedGasLimit.Uint64(),
+	}
+	FixedBlockSizeFlag = cli.IntFlag{
+		Name: "fixedblocksize",
+		Usage: "fixed block size",
+		Value: params.FixedBlockSize,
+	}
+	MaxBlockIntervalFlag = cli.IntFlag{
+		Name: "maxblockinterval",
+		Usage: "longest wait duration between block generation",
+		Value: params.MaxBlockInterval,
+	}
+	LeaderYieldAfterFlag = cli.IntFlag{
+		Name: "leaderyieldafter",
+		Usage: "leader yield after making given number of blocks",
+		Value: params.LeaderYieldAfter,
+	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating
@@ -1059,6 +1084,11 @@ func RegisterEthStatsService(stack *node.Node, url string) {
 func SetupNetwork(ctx *cli.Context) {
 	// TODO(fjl): move target gas limit into config
 	params.TargetGasLimit = new(big.Int).SetUint64(ctx.GlobalUint64(TargetGasLimitFlag.Name))
+	params.FixedDifficulty = new(big.Int).SetUint64(ctx.GlobalUint64(FixedDifficultyFlag.Name))
+	params.FixedGasLimit = new(big.Int).SetUint64(ctx.GlobalUint64(FixedGasLimitFlag.Name))
+	params.FixedBlockSize = int(ctx.GlobalInt64(FixedBlockSizeFlag.Name))
+	params.MaxBlockInterval = int(ctx.GlobalInt64(MaxBlockIntervalFlag.Name))
+	params.LeaderYieldAfter = int(ctx.GlobalInt64(LeaderYieldAfterFlag.Name))
 }
 
 // MakeChainDatabase open an LevelDB using the flags passed to the client and will hard crash if it fails.
