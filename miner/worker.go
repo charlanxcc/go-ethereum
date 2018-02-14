@@ -306,6 +306,10 @@ func (self *worker) wait() {
 				go self.mux.Post(core.NewMinedBlockEvent{Block: block})
 			} else {
 				if work == nil {
+					if len(self.recv) > 0 {
+						continue
+					}
+					
 					log.Debug("No work to do, sleeping for 2 seconds!")
 					to := make(chan bool, 1)
 					go func() {
@@ -549,15 +553,12 @@ func (self *worker) commitNewWork() {
 func (self *worker) commitUncle(work *Work, uncle *types.Header) error {
 	hash := uncle.Hash()
 	if work.uncles.Has(hash) {
-		log.Error("XXX: Uncle not unique", hash)
 		return fmt.Errorf("uncle not unique")
 	}
 	if !work.ancestors.Has(uncle.ParentHash) {
-		log.Error("XXX: Uncle parfent", uncle.ParentHash, "unknown of", hash)
 		return fmt.Errorf("uncle's parent unknown (%x)", uncle.ParentHash[0:4])
 	}
 	if work.family.Has(hash) {
-		log.Error("XXX: Uncle already in family", hash)
 		return fmt.Errorf("uncle already in family (%x)", hash)
 	}
 	work.uncles.Add(uncle.Hash())
