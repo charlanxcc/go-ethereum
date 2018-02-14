@@ -160,7 +160,8 @@ func YieldLeadership() {
 			uint64(members[j].ID))
 		cancel()
 		if err == nil {
-			log.Info(fmt.Sprintf("Yielded leadership to %s\n", members[j].ID))
+			log.Info(fmt.Sprintf("Yielded leadership to %s:%s\n",
+				members[j].Attributes.Name, members[j].ID))
 			return
 		}
 	}
@@ -231,9 +232,6 @@ func LogBlock(number uint64, hash string, count int) {
 }
 
 func TxNotify() {
-	if !IsLeader() {
-		return
-	}
 	TxNotifier <- true
 }
 
