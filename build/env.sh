@@ -7,6 +7,16 @@ if [ ! -f "build/env.sh" ]; then
     exit 2
 fi
 
+# Download etcd if it doesn't exist yet.
+if [ ! -d "$PWD"/vendor/github.com/coreos/etcd ]; then
+    [ -d "$PWD"/vendor/github.com/coreos ] || mkdir -p "$PWD"/vendor/github.com/coreos;
+    git clone https://github.com/coreos/etcd $PWD/vendor/github.com/coreos/etcd
+    if [ ! $? = 0 ]; then
+        echo "Failed to get etcd.";
+        exit 2
+    fi
+fi
+
 # Create fake Go workspace if it doesn't exist yet.
 workspace="$PWD/build/_workspace"
 root="$PWD"
