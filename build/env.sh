@@ -7,7 +7,7 @@ if [ ! -f "build/env.sh" ]; then
     exit 2
 fi
 
-# Download etcd if it doesn't exist yet.
+# Download etcd if it doesn't exist yet. Need to figure out release or tags later.
 if [ ! -d "$PWD"/vendor/github.com/coreos/etcd ]; then
     [ -d "$PWD"/vendor/github.com/coreos ] || mkdir -p "$PWD"/vendor/github.com/coreos;
     git clone https://github.com/coreos/etcd $PWD/vendor/github.com/coreos/etcd
