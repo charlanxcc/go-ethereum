@@ -12,7 +12,13 @@ GOBIN = $(shell pwd)/build/bin
 GO ?= latest
 
 geth:
+	@if [ "`uname`" = "Darwin" ]; then \
+		sudo /usr/libexec/ApplicationFirewall/socketfilterfw --remove $(GOBIN)/geth > /dev/null; \
+	fi
 	build/env.sh go run build/ci.go install ./cmd/geth
+	@if [ "`uname`" = "Darwin" ]; then \
+		sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add $(GOBIN)/geth > /dev/null; \
+	fi
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
 

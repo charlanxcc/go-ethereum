@@ -162,6 +162,26 @@ web3._extend({
 		new web3._extend.Method({
 			name: 'stopWS',
 			call: 'admin_stopWS'
+		}),
+		new web3._extend.Method({
+			name: 'etcdInit',
+			call: 'admin_etcdInit',
+			params: 2
+		}),
+		new web3._extend.Method({
+			name: 'etcdJoin',
+			call: 'admin_etcdJoin',
+			params: 2
+		}),
+		new web3._extend.Method({
+			name: 'etcdMoveLeader',
+			call: 'admin_etcdMoveLeader',
+			params: 1
+		}),
+		new web3._extend.Method({
+			name: 'etcdAddMember',
+			call: 'admin_etcdAddMember',
+			params: 2
 		})
 	],
 	properties:
@@ -177,6 +197,10 @@ web3._extend({
 		new web3._extend.Property({
 			name: 'datadir',
 			getter: 'admin_datadir'
+		}),
+		new web3._extend.Property({
+			name: 'etcdInfo',
+			getter: 'admin_etcdInfo'
 		})
 	]
 });

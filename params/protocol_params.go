@@ -85,6 +85,7 @@ var (
 
 // custom parameters
 var (
+	AdminContractAddress= "0x0000000000000000000000000000000000000000"
 	FixedDifficulty     = big.NewInt(0)         // 0 means no fixed difficulty
 	FixedGasLimit       = big.NewInt(0)         // 0 means no fixed gas limit
 	FixedBlockSize      = 0                     // 0 means no block size limit

@@ -23,6 +23,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/etcdhelper"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/rcrowley/go-metrics"
@@ -216,6 +217,47 @@ func (api *PublicAdminAPI) NodeInfo() (*p2p.NodeInfo, error) {
 // Datadir retrieves the current data directory the node is using.
 func (api *PublicAdminAPI) Datadir() string {
 	return api.node.DataDir()
+}
+
+// EtcdInfo retrieves etcd related information
+func (api *PublicAdminAPI) EtcdInfo() (interface{}, error) {
+	return etcdhelper.Info(), nil
+}
+
+// admin_etcdInit
+func (api *PrivateAdminAPI) EtcdInit(name, cluster string) (bool, error) {
+	if err := etcdhelper.StartEtcd(name, cluster, api.node.DataDir(), true); err != nil {
+		return false, err
+	} else {
+		return true, nil
+	}
+}
+
+// admin_etcdJoin
+func (api *PrivateAdminAPI) EtcdJoin(name, cluster string) (bool, error) {
+	if err := etcdhelper.StartEtcd(name, cluster, api.node.DataDir(), false); err != nil {
+		return false, err
+	} else {
+		return true, nil
+	}
+}
+
+// admin_etcdMoveLeader
+func (api *PrivateAdminAPI) EtcdMoveLeader(id string) (bool, error) {
+	if err := etcdhelper.MoveLeader(id); err != nil {
+		return false, err
+	} else {
+		return true, nil
+	}
+}
+
+// admin_etcdAddMember
+func (api *PrivateAdminAPI) EtcdAddMember(name, peerURL string) (string, error) {
+	if rs, err := etcdhelper.AddMember(name, peerURL); err != nil {
+		return "", err
+	} else {
+		return rs, nil
+	}
 }
 
 // PublicDebugAPI is the collection of debugging related API methods exposed over

@@ -485,15 +485,10 @@ var (
 		Usage: "Minimum POW accepted",
 		Value: whisper.DefaultMinimumPoW,
 	}
-	EtcdNameFlag = cli.StringFlag{
-		Name: "etcdname",
-		Usage: "etcd name",
-		Value: "",
-	}
-	EtcdClusterFlag = cli.StringFlag{
-		Name: "etcdcluster",
-		Usage: "etcd cluster",
-		Value: "",
+	AdminContractAddressFlag = cli.StringFlag{
+		Name: "admincontractaddress",
+		Usage: "Admin Contract Address",
+		Value: "0x0000000000000000000000000000000000000000",
 	}
 	FixedDifficultyFlag = cli.Uint64Flag{
 		Name: "fixeddifficulty",
@@ -1083,6 +1078,11 @@ func RegisterEthStatsService(stack *node.Node, url string) {
 // SetupNetwork configures the system for either the main net or some test network.
 func SetupNetwork(ctx *cli.Context) {
 	// TODO(fjl): move target gas limit into config
+	addr := ctx.GlobalString(AdminContractAddressFlag.Name)
+	if !common.IsHexAddress(addr) {
+		Fatalf("Invalid AdminContractAddress: %s", addr)
+	}
+	params.AdminContractAddress = addr
 	params.TargetGasLimit = new(big.Int).SetUint64(ctx.GlobalUint64(TargetGasLimitFlag.Name))
 	params.FixedDifficulty = new(big.Int).SetUint64(ctx.GlobalUint64(FixedDifficultyFlag.Name))
 	params.FixedGasLimit = new(big.Int).SetUint64(ctx.GlobalUint64(FixedGasLimitFlag.Name))

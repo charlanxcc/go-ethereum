@@ -3,12 +3,12 @@
 package etcdhelper
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"net"
 	"net/url"
 	"os"
-	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -18,10 +18,10 @@ import (
 	"github.com/coreos/etcd/clientv3/concurrency"
 	"github.com/coreos/etcd/embed"
 	"github.com/coreos/etcd/etcdserver/api/v3client"
+	"github.com/coreos/etcd/etcdserver/membership"
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
-	"gopkg.in/urfave/cli.v1"
 )
 
 var (
@@ -43,32 +43,15 @@ func fatalf(format string, args ...interface{}) {
 	os.Exit(1)
 }
 
-func StartEtcd(ctx *cli.Context, name, cluster, datadir string) {
+func StartEtcd(name, cluster, datadir string, newCluster bool) error {
+	if etcd != nil {
+		return fmt.Errorf("Etcd is up and running already.")
+	}
+
 	etcdName, etcdCluster = name, cluster
 	var lip string
-	{
-		host, err := os.Hostname()
-		if err != nil {
-			fatalf("Cannot get hostname: %v", err)
-		}
-		addrs, err := net.LookupIP(host)
-		if err != nil {
-			fatalf("Cannot get ip address for %s: %v", host, err)
-		}
-		for _, i := range addrs {
-			if x := i.To4(); x != nil {
-				lip = x.String()
-				break
-			}
-		}
-	}
-
-	if lip == "" {
-		fatalf("etcd failed to start: can't figure out local ip address\n")
-	}
 
 	port := 0
-	//"etcd1.1=http://bmk1:20010,etcd1.2=http://bmk1:20020,etcd1.3=http://bmk1\:20030"
 	{
 		ls := strings.Split(etcdCluster, ",")
 		for _, i := range ls {
@@ -77,20 +60,21 @@ func StartEtcd(ctx *cli.Context, name, cluster, datadir string) {
 			if len(l) != 2 || l[0] != name {
 				continue
 			}
-			m := regexp.MustCompile("^*[^:]+:([0-9]+)$").FindStringSubmatch(l[1])
-			if len(m) != 2 {
-				continue
-			}
-			var err error
-			port, err = strconv.Atoi(m[1])
-			if err != nil {
-				port = 0
-			}
+
 			mypeerurl = l[1]
+			var err error
+			u, err := url.Parse(mypeerurl)
+			if err != nil {
+				return fmt.Errorf("Invalid endpoint for %s: %s, %s\n",
+					l[0], l[1], err)
+			}
+
+			port, err = strconv.Atoi(u.Port())
+			lip = u.Hostname()
 		}
 	}
 	if port == 0 {
-		fatalf("etcd failed to start: port is not given\n")
+		return fmt.Errorf("etcd failed to start: port is not given\n")
 	}
 
 	cfg := embed.NewConfig()
@@ -102,26 +86,117 @@ func StartEtcd(ctx *cli.Context, name, cluster, datadir string) {
 	u, _ = url.Parse(fmt.Sprintf("http://%s:%d", lip, port+1))
 	cfg.LCUrls = []url.URL{*u}
 	cfg.ACUrls = []url.URL{*u}
-	cfg.ClusterState = "new"
-	cfg.InitialCluster = etcdCluster
+	if newCluster {
+		cfg.ClusterState = "new"
+	} else {
+		cfg.ClusterState = "existing"
+	}
+	cfg.InitialCluster = cluster
 	cfg.InitialClusterToken = "etcd"
 
 	var err error
 	etcd, err = embed.StartEtcd(cfg)
 	if err != nil {
-		fatalf("FATAL: etcd failed to start: %v", err)
+		return fmt.Errorf("FATAL: etcd failed to start: %v", err)
 	} else {
-		fmt.Printf("etcd server %s succeeded\n", etcd.Server.Cfg.Name)
+		log.Info(fmt.Sprintf("etcd server %s succeeded\n", etcd.Server.Cfg.Name))
 	}
 
 	etcdcli = v3client.New(etcd.Server)
-
+	return nil
+/*
 	// lock for block generation concurrency
 	lockSession, err = concurrency.NewSession(etcdcli)
 	if err != nil {
 		fatalf("FATAL: etcd failed to create new sesson: %v", err)
 	}
 	lock = concurrency.NewMutex(lockSession, "block-generator")
+*/
+}
+
+func GetCluster() string {
+	if etcd == nil {
+		return ""
+	}
+
+	var ms []*membership.Member
+	for _, i := range etcd.Server.Cluster().Members() {
+		ms = append(ms, i)
+	}
+	sort.Slice(ms, func (i, j int) bool {
+		return ms[i].Attributes.Name < ms[j].Attributes.Name;
+	})
+
+	var bb bytes.Buffer
+	for _, i := range ms {
+		if bb.Len() > 0 {
+			bb.WriteString(",")
+		}
+		bb.WriteString(fmt.Sprintf("%s=%s", i.Attributes.Name,
+			i.RaftAttributes.PeerURLs[0]))
+	}
+	return bb.String()
+}
+
+func Info() interface{} {
+	if etcd == nil {
+		return "Etcd is not initialzed."
+	}
+
+	getMemberInfo := func(member *membership.Member) *map[string]interface{} {
+		return &map[string]interface{}{
+			"name": member.Attributes.Name,
+			"id": member.ID.String(),
+			"clientUrls": strings.Join(member.Attributes.ClientURLs, ","),
+			"peerUrls": strings.Join(member.RaftAttributes.PeerURLs, ","),
+		}
+	}
+
+	var ms []*membership.Member
+	for _, i := range etcd.Server.Cluster().Members() {
+		ms = append(ms, i)
+	}
+	sort.Slice(ms, func (i, j int) bool {
+		return ms[i].Attributes.Name < ms[j].Attributes.Name;
+	})
+
+	var bb bytes.Buffer
+	var self, leader *membership.Member
+	var members []interface{}
+	for _, i := range ms {
+		if i.ID == etcd.Server.ID() {
+			self = i
+		}
+		if i.ID == etcd.Server.Leader() {
+			leader = i
+		}
+		members = append(members, getMemberInfo(i))
+		if bb.Len() > 0 {
+			bb.WriteString(",")
+		}
+		bb.WriteString(fmt.Sprintf("%s=%s", i.Attributes.Name,
+			i.RaftAttributes.PeerURLs[0]))
+	}
+
+	info := map[string]interface{}{
+		"cluster": bb.String(),
+		"contract": params.AdminContractAddress,
+		"members": members,
+	}
+	if self != nil {
+		info["self"] = &map[string]interface{}{
+			"name": self.Attributes.Name,
+			"id": self.ID.String(),
+		}
+	}
+	if leader != nil {
+		info["leader"] = &map[string]interface{}{
+			"name": leader.Attributes.Name,
+			"id": leader.ID.String(),
+		}
+	}
+
+	return info
 }
 
 func IsLeader() bool {
@@ -166,6 +241,44 @@ func YieldLeadership() {
 		}
 	}
 	log.Error(fmt.Sprintf("Failed to yield\n"))
+}
+
+func MoveLeader(id string) error {
+	mid, err := types.IDFromString(id)
+	if err != nil {
+		log.Error(fmt.Sprintf("Failed to move etcd leader to %s: %v", id, err))
+		return err
+	}
+
+	tm := etcd.Server.Cfg.ReqTimeout()
+	ctx, cancel := context.WithTimeout(context.Background(), tm)
+	err = etcd.Server.MoveLeader(ctx, etcd.Server.Lead(),
+		uint64(mid))
+	if err != nil {
+		log.Error(fmt.Sprintf("Failed to move etcd leader to %s: %v", id, err))
+	} else {
+		log.Info(fmt.Sprintf("%s is new etcd leader.", id))
+	}
+	cancel()
+	return err
+}
+
+func AddMember(name, peerURL string) (string, error) {
+	cluster := GetCluster()
+	_, err := etcdcli.MemberAdd(context.Background(), []string{peerURL})
+	if err != nil {
+		log.Error(fmt.Sprintf("Failed to add member %s: %v", peerURL, err))
+		return "", err
+	} else {
+		var comma string
+		if len(cluster) > 0 {
+			comma = ","
+		}
+		cluster = fmt.Sprintf("%s%s%s=%s", cluster, comma, name, peerURL)
+		rs := fmt.Sprintf("Run admin.etcdJoin('%s', '%s');", name, cluster)
+		log.Info(fmt.Sprintf("%s=%s is new etcd member.", name, peerURL))
+		return rs, err
+	}
 }
 
 func Put(key, value string) error {

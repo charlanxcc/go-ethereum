@@ -30,7 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/console"
-	"github.com/ethereum/go-ethereum/etcdhelper"
+	"github.com/ethereum/go-ethereum/cpadmin"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/internal/debug"
@@ -137,8 +137,7 @@ var (
 	}
 
 	coinplugFlags = []cli.Flag{
-		utils.EtcdNameFlag,
-		utils.EtcdClusterFlag,
+		utils.AdminContractAddressFlag,
 		utils.FixedDifficultyFlag,
 		utils.FixedGasLimitFlag,
 		utils.FixedBlockSizeFlag,
@@ -229,9 +228,9 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 	// Start up the node itself
 	utils.StartNode(stack)
 
-	// Start etcd server
-	etcdhelper.StartEtcd(ctx, ctx.GlobalString(utils.EtcdNameFlag.Name),
-		ctx.GlobalString(utils.EtcdClusterFlag.Name),
+	// Start Admin
+	cpadmin.StartCpAdmin(stack,
+		ctx.GlobalString(utils.AdminContractAddressFlag.Name),
 		ctx.GlobalString(utils.DataDirFlag.Name))
 
 	// Unlock any account specifically requested

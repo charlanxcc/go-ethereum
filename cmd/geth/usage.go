@@ -204,8 +204,7 @@ var AppHelpFlagGroups = []flagGroup{
 	{
 		Name: "COINPLUG",
 		Flags: []cli.Flag{
-			utils.EtcdNameFlag,
-			utils.EtcdClusterFlag,
+			utils.AdminContractAddressFlag,
 			utils.FixedDifficultyFlag,
 			utils.FixedGasLimitFlag,
 			utils.FixedBlockSizeFlag,
